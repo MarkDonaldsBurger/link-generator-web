@@ -172,11 +172,11 @@ if sheet:
         
         if df_tokens is not None and not df_tokens.empty:
             # Inline search filtering box
-            search_query = st.text_input("🔍 Filter by Ticket No. or Token String").lower()
+            search_query = st.text_input("🔍 Filter by Ticket No. or Token String").strip().lower()
             if search_query:
                 df_tokens = df_tokens[
-                    df_tokens['Ticket No.'].str.lower().str.contains(search_query) | 
-                    df_tokens['Token'].str.lower().str.contains(search_query)
+                    df_tokens['Ticket No.'].astype(str).str.lower().str.contains(search_query) | 
+                    df_tokens['Token'].astype(str).str.lower().str.contains(search_query)
                 ]
             
             st.caption("📝 **Tip:** Double-click any cell in the **Status** column below to change it directly inside the grid!")
