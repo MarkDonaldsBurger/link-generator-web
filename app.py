@@ -6,7 +6,7 @@ from datetime import datetime
 import pandas as pd
 
 # Set up browser page configuration
-st.set_page_config(title="Link Generator & Status Tracker", layout="wide")
+st.set_page_config(page_title="Link Generator & Status Tracker", layout="wide")
 
 # 1. Authenticate with Google Sheets using Streamlit Secrets
 @st.cache_resource
