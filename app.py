@@ -109,9 +109,9 @@ if sheet:
     with col2:
         st.subheader("Real-Time Token Sync View")
         
-        # Manual Force Refresh Button
         if st.button("🔄 Refresh Shared Sheet Data"):
             st.cache_data.clear()
+            st.invalidate_pages()
             
         df_tokens = load_tokens_from_sheet(sheet)
         
@@ -124,21 +124,39 @@ if sheet:
                     df_tokens['Token'].str.lower().str.contains(search_query)
                 ]
             
-            # Display interactive Data Grid
-            st.dataframe(df_tokens, use_container_width=True, hide_index=True)
+            st.caption("📝 **Tip:** Double-click any cell in the **Status** column below to change it directly inside the grid!")
+
+            # Configuration for the interactive data grid
+            edited_df = st.data_editor(
+                df_tokens,
+                use_container_width=True,
+                hide_index=True,
+                disabled=["Token", "Date Issued", "Ticket No.", "Form URL", "Type"], # Locks other columns
+                column_config={
+                    "Status": st.column_config.SelectboxColumn(
+                        "Status",
+                        help="The runtime state of the link",
+                        options=["On hold", "Active", "Terminated", "Used"],
+                        required=True,
+                    )
+                },
+                key="token_editor"
+            )
             
-            # Interactive Action Segment for Status Tracking
-            st.markdown("---")
-            st.caption("💡 Select a Token below to manually advance or terminate its status across the system:")
-            
-            with st.form("status_update_form", clear_on_submit=True):
-                target_token = st.selectbox("Select Target Token ID", options=df_tokens['Token'].values)
-                next_status = st.selectbox("Set New Target Status", ["Active", "Used", "Terminated", "On hold"])
-                
-                if st.form_submit_button("Apply Global Status Change"):
-                    if update_token_status(sheet, target_token, next_status):
-                        st.toast(f"Token status shifted successfully to {next_status}!", icon="✅")
-                        st.cache_data.clear()
-                        st.rerun()
+            # Detect changes made inside the data editor grid
+            if st.session_state.get("token_editor") and st.session_state.token_editor.get("edited_rows"):
+                changes = st.session_state.token_editor["edited_rows"]
+                for row_idx, updated_cols in changes.items():
+                    if "Status" in updated_cols:
+                        # Grab the specific token string from the edited row index
+                        token_to_update = df_tokens.iloc[int(row_idx)]["Token"]
+                        new_status_value = updated_cols["Status"]
+                        
+                        # Push updates directly to the Google Sheet backend
+                        with st.spinner("Syncing status change to Google Sheets..."):
+                            if update_token_status(sheet, token_to_update, new_status_value):
+                                st.toast(f"Status updated to {new_status_value}!", icon="🚀")
+                                st.cache_data.clear()
+                                st.rerun()
         else:
             st.info("The central datastore is currently tracking 0 active links.")
