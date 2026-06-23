@@ -41,13 +41,11 @@ def load_tokens_from_sheet(sheet):
         df = pd.DataFrame(records)
         
         # Build the full clickable/copyable URL column dynamically
-        # It takes the base application URL structure and appends the unique token
         base_app_url = "https://dynamiclinkgeneratorpy-jvrqcasnbsduy6hwwmco58.streamlit.app/"
         df["Full Generated Link"] = base_app_url + "?token=" + df["Token"].astype(str)
         
         # Reorder columns so the Full Link is easily visible
         desired_order = ["Token", "Status", "Date Issued", "Ticket No.", "Full Generated Link", "Form URL", "Type"]
-        # Ensure only columns that exist are ordered
         current_order = [col for col in desired_order if col in df.columns]
         df = df[current_order]
         
@@ -90,7 +88,7 @@ if sheet:
     # Create two primary columns (Left Input Panel, Right Tracker Data Panel)
     col1, col2 = st.columns([1, 2])
     
-with col1:
+    with col1:
         st.subheader("Generate New Request Link")
         ticket_no = st.text_input("Ticket No. / Identifier", placeholder="Enter unique ID...")
         initial_status = st.selectbox("Initial Status", ["On hold", "Active", "Terminated", "Used"])
@@ -114,11 +112,13 @@ with col1:
                         st.error(f"Validation Error: Ticket No. '{ticket_no.strip()}' already has an active EXTERNAL link.")
                     else:
                         # Proceed with generation if clear
-                        token, url = generate_client_link(sheet, ticket_no.strip(), initial_status, "EXTERNAL")
-                        if token:
-                            st.success("Successfully generated and synced!")
-                            st.text_area("Generated URL (Copy below):", value=url, height=70)
-                            st.cache_data.clear() # Clear view cache to refresh table data
+                        with st.spinner("Generating External Link..."):
+                            token, url = generate_client_link(sheet, ticket_no.strip(), initial_status, "EXTERNAL")
+                            if token:
+                                st.success("Successfully generated and synced!")
+                                st.text_area("Generated URL (Copy below):", value=url, height=70)
+                                st.cache_data.clear() # Clear view cache to refresh table data
+                                st.rerun()
                 else:
                     st.warning("Please fill in the Ticket Number field.")
                     
@@ -140,11 +140,13 @@ with col1:
                         st.error(f"Validation Error: Ticket No. '{ticket_no.strip()}' already has an active INTERNAL link.")
                     else:
                         # Proceed with generation if clear
-                        token, url = generate_client_link(sheet, ticket_no.strip(), initial_status, "INTERNAL")
-                        if token:
-                            st.success("Successfully generated and synced!")
-                            st.text_area("Generated URL (Copy below):", value=url, height=70)
-                            st.cache_data.clear()
+                        with st.spinner("Generating Internal Link..."):
+                            token, url = generate_client_link(sheet, ticket_no.strip(), initial_status, "INTERNAL")
+                            if token:
+                                st.success("Successfully generated and synced!")
+                                st.text_area("Generated URL (Copy below):", value=url, height=70)
+                                st.cache_data.clear()
+                                st.rerun()
                 else:
                     st.warning("Please fill in the Ticket Number field.")
 
@@ -154,6 +156,7 @@ with col1:
         if st.button("🔄 Refresh Shared Sheet Data"):
             st.cache_data.clear()
             st.invalidate_pages()
+            st.rerun()
             
         df_tokens = load_tokens_from_sheet(sheet)
         
