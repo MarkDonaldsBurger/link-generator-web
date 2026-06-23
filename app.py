@@ -166,7 +166,6 @@ if sheet:
         
         if st.button("🔄 Refresh Shared Sheet Data"):
             st.cache_data.clear()
-            st.invalidate_pages()
             st.rerun()
             
         df_tokens = load_tokens_from_sheet(sheet)
