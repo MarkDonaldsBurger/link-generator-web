@@ -34,14 +34,26 @@ def get_sheet():
 # 2. Database Core Operations (Synced Cloud Actions)
 def load_tokens_from_sheet(sheet):
     try:
-        all_rows = sheet.get_all_values()
-        if len(all_rows) > 1:
-            # Convert to Pandas DataFrame for easier filtering and manipulation
-            df = pd.DataFrame(all_rows[1:], columns=["Token", "Status", "Date Issued", "Ticket No.", "Form URL", "Type"])
-            return df
-        return pd.DataFrame(columns=["Token", "Status", "Date Issued", "Ticket No.", "Form URL", "Type"])
+        records = sheet.get_all_records()
+        if not records:
+            return pd.DataFrame()
+        
+        df = pd.DataFrame(records)
+        
+        # Build the full clickable/copyable URL column dynamically
+        # It takes the base application URL structure and appends the unique token
+        base_app_url = "https://dynamiclinkgeneratorpy-jvrqcasnbsduy6hwwmco58.streamlit.app/"
+        df["Full Generated Link"] = base_app_url + "?token=" + df["Token"].astype(str)
+        
+        # Reorder columns so the Full Link is easily visible
+        desired_order = ["Token", "Status", "Date Issued", "Ticket No.", "Full Generated Link", "Form URL", "Type"]
+        # Ensure only columns that exist are ordered
+        current_order = [col for col in desired_order if col in df.columns]
+        df = df[current_order]
+        
+        return df
     except Exception as e:
-        st.error(f"Error fetching data: {e}")
+        st.error(f"Error reading datastore: {e}")
         return None
 
 def generate_client_link(sheet, client_name, status, link_type):
@@ -78,7 +90,7 @@ if sheet:
     # Create two primary columns (Left Input Panel, Right Tracker Data Panel)
     col1, col2 = st.columns([1, 2])
     
-    with col1:
+with col1:
         st.subheader("Generate New Request Link")
         ticket_no = st.text_input("Ticket No. / Identifier", placeholder="Enter unique ID...")
         initial_status = st.selectbox("Initial Status", ["On hold", "Active", "Terminated", "Used"])
@@ -87,22 +99,52 @@ if sheet:
         with btn_ext:
             if st.button("Generate External Link", use_container_width=True):
                 if ticket_no.strip():
-                    token, url = generate_client_link(sheet, ticket_no.strip(), initial_status, "EXTERNAL")
-                    if token:
-                        st.success("Successfully generated and synced!")
-                        st.text_area("Generated URL (Copy below):", value=url, height=70)
-                        st.cache_data.clear() # Clear view cache to refresh table data
+                    # 1. Pull current sheet data to look for duplicate tickets
+                    current_df = load_tokens_from_sheet(sheet)
+                    
+                    # 2. Check if this ticket already has an EXTERNAL record
+                    duplicate_exists = False
+                    if current_df is not None and not current_df.empty:
+                        duplicate_exists = not current_df[
+                            (current_df["Ticket No."].astype(str) == str(ticket_no.strip())) & 
+                            (current_df["Type"] == "EXTERNAL")
+                        ].empty
+                    
+                    if duplicate_exists:
+                        st.error(f"Validation Error: Ticket No. '{ticket_no.strip()}' already has an active EXTERNAL link.")
+                    else:
+                        # Proceed with generation if clear
+                        token, url = generate_client_link(sheet, ticket_no.strip(), initial_status, "EXTERNAL")
+                        if token:
+                            st.success("Successfully generated and synced!")
+                            st.text_area("Generated URL (Copy below):", value=url, height=70)
+                            st.cache_data.clear() # Clear view cache to refresh table data
                 else:
                     st.warning("Please fill in the Ticket Number field.")
                     
         with btn_int:
             if st.button("Generate Internal Link", use_container_width=True):
                 if ticket_no.strip():
-                    token, url = generate_client_link(sheet, ticket_no.strip(), initial_status, "INTERNAL")
-                    if token:
-                        st.success("Successfully generated and synced!")
-                        st.text_area("Generated URL (Copy below):", value=url, height=70)
-                        st.cache_data.clear()
+                    # 1. Pull current sheet data to look for duplicate tickets
+                    current_df = load_tokens_from_sheet(sheet)
+                    
+                    # 2. Check if this ticket already has an INTERNAL record
+                    duplicate_exists = False
+                    if current_df is not None and not current_df.empty:
+                        duplicate_exists = not current_df[
+                            (current_df["Ticket No."].astype(str) == str(ticket_no.strip())) & 
+                            (current_df["Type"] == "INTERNAL")
+                        ].empty
+                    
+                    if duplicate_exists:
+                        st.error(f"Validation Error: Ticket No. '{ticket_no.strip()}' already has an active INTERNAL link.")
+                    else:
+                        # Proceed with generation if clear
+                        token, url = generate_client_link(sheet, ticket_no.strip(), initial_status, "INTERNAL")
+                        if token:
+                            st.success("Successfully generated and synced!")
+                            st.text_area("Generated URL (Copy below):", value=url, height=70)
+                            st.cache_data.clear()
                 else:
                     st.warning("Please fill in the Ticket Number field.")
 
@@ -131,7 +173,7 @@ if sheet:
                 df_tokens,
                 use_container_width=True,
                 hide_index=True,
-                disabled=["Token", "Date Issued", "Ticket No.", "Form URL", "Type"], # Locks other columns
+                disabled=["Token", "Date Issued", "Ticket No.", "Full Generated Link", "Form URL", "Type"], # Locks other columns
                 column_config={
                     "Status": st.column_config.SelectboxColumn(
                         "Status",
