@@ -12,4 +12,4 @@ jobs:
     steps:
       - name: Ping Streamlit Web URL
         run: |
-          curl -s -L -o /dev/null -w "%{http_code}" https://link-generator-web-8trpk7xz4zgpg5pkpdmdsp.streamlit.app/
+          curl -s -o /dev/null -w "%{http_code}" https://link-generator-web-8trpk7xz4zgpg5pkpdmdsp.streamlit.app/
