@@ -143,8 +143,29 @@ if sheet:
                             st.success("Verification successful! Access granted.")
                             st.markdown("### Click below to proceed to your assignment workspace:")
                             
-                            # Safely render target redirection element to verified domain users
-                            st.link_button("👉 Open Microsoft Form Workspace", url=form_url, use_container_width=True)
+                            # MODIFIED LINE (Old line 132): Broken out of the iframe using target="_blank" HTML wrapper 
+                            st.markdown(
+                                f"""
+                                <a href="{form_url}" target="_blank" style="text-decoration: none;">
+                                    <button style="
+                                        width: 100%;
+                                        background-color: #ff4b4b;
+                                        color: white;
+                                        border: none;
+                                        padding: 0.5rem 1rem;
+                                        border-radius: 0.5rem;
+                                        cursor: pointer;
+                                        font-size: 1rem;
+                                        font-weight: 500;
+                                        line-height: 1.6;
+                                        text-align: center;
+                                    ">
+                                        👉 Open Microsoft Form Workspace (Opens New Tab)
+                                    </button>
+                                </a>
+                                """,
+                                unsafe_allow_html=True
+                            )
     else:
         # --------------------------------------------------
         # CONSOLE VIEW: Standard administrative control room
