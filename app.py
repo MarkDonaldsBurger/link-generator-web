@@ -90,6 +90,19 @@ def update_token_status(sheet, token, new_status):
         st.error(f"Failed to update status: {e}")
         return False
 
+# Dialog prompt that opens cleanly when links are successfully made
+@st.dialog("🚀 Link Successfully Generated!")
+def show_success_popup(url, link_type, ticket):
+    st.success(f"Successfully created a new **{link_type}** tracking link.")
+    st.write(f"**Ticket Ref:** {ticket}")
+    
+    # Text area holding the link + automated copy helper
+    st.text_area("Copy Dynamic Link:", value=url, height=80, help="Click anywhere inside or click the copy shortcut tool.")
+    
+    if st.button("Close & Refresh Dashboard", type="primary", use_container_width=True):
+        st.cache_data.clear()
+        st.rerun()
+
 # 3. Runtime Routing & Web Interface Construction
 sheet = get_sheet()
 
@@ -150,10 +163,7 @@ if sheet:
             with btn_ext:
                 if st.button("Generate External Link", use_container_width=True):
                     if ticket_no.strip():
-                        # 1. Pull current sheet data to look for duplicate tickets
                         current_df = load_tokens_from_sheet(sheet)
-                        
-                        # 2. Check if this ticket already has an EXTERNAL record
                         duplicate_exists = False
                         if current_df is not None and not current_df.empty:
                             duplicate_exists = not current_df[
@@ -164,24 +174,17 @@ if sheet:
                         if duplicate_exists:
                             st.error(f"Validation Error: Ticket No. '{ticket_no.strip()}' already has an active EXTERNAL link.")
                         else:
-                            # Proceed with generation if clear
                             with st.spinner("Generating External Link..."):
                                 token, url = generate_client_link(sheet, ticket_no.strip(), initial_status, "EXTERNAL")
                                 if token:
-                                    st.success("Successfully generated and synced!")
-                                    st.text_area("Generated URL (Copy below):", value=url, height=70)
-                                    st.cache_data.clear() # Clear view cache to refresh table data
-                                    st.rerun()
+                                    show_success_popup(url, "EXTERNAL", ticket_no.strip())
                     else:
                         st.warning("Please fill in the Ticket Number field.")
                         
             with btn_int:
                 if st.button("Generate Internal Link", use_container_width=True):
                     if ticket_no.strip():
-                        # 1. Pull current sheet data to look for duplicate tickets
                         current_df = load_tokens_from_sheet(sheet)
-                        
-                        # 2. Check if this ticket already has an INTERNAL record
                         duplicate_exists = False
                         if current_df is not None and not current_df.empty:
                             duplicate_exists = not current_df[
@@ -192,14 +195,10 @@ if sheet:
                         if duplicate_exists:
                             st.error(f"Validation Error: Ticket No. '{ticket_no.strip()}' already has an active INTERNAL link.")
                         else:
-                            # Proceed with generation if clear
                             with st.spinner("Generating Internal Link..."):
                                 token, url = generate_client_link(sheet, ticket_no.strip(), initial_status, "INTERNAL")
                                 if token:
-                                    st.success("Successfully generated and synced!")
-                                    st.text_area("Generated URL (Copy below):", value=url, height=70)
-                                    st.cache_data.clear()
-                                    st.rerun()
+                                    show_success_popup(url, "INTERNAL", ticket_no.strip())
                     else:
                         st.warning("Please fill in the Ticket Number field.")
 
@@ -213,7 +212,6 @@ if sheet:
             df_tokens = load_tokens_from_sheet(sheet)
             
             if df_tokens is not None and not df_tokens.empty:
-                # Inline search filtering box
                 search_query = st.text_input("🔍 Filter by Ticket No. or Token String").strip().lower()
                 if search_query:
                     df_tokens = df_tokens[
@@ -223,12 +221,11 @@ if sheet:
                 
                 st.caption("📝 **Tip:** Double-click any cell in the **Status** column below to change it directly inside the grid!")
 
-                # Configuration for the interactive data grid
                 edited_df = st.data_editor(
                     df_tokens,
                     use_container_width=True,
                     hide_index=True,
-                    disabled=["Token", "Date Issued", "Ticket No.", "Full Generated Link", "Form URL", "Type"], # Locks other columns
+                    disabled=["Token", "Date Issued", "Ticket No.", "Full Generated Link", "Form URL", "Type"], 
                     column_config={
                         "Status": st.column_config.SelectboxColumn(
                             "Status",
@@ -240,16 +237,13 @@ if sheet:
                     key="token_editor"
                 )
                 
-                # Detect changes made inside the data editor grid
                 if st.session_state.get("token_editor") and st.session_state.token_editor.get("edited_rows"):
                     changes = st.session_state.token_editor["edited_rows"]
                     for row_idx, updated_cols in changes.items():
                         if "Status" in updated_cols:
-                            # Grab the specific token string from the edited row index
                             token_to_update = df_tokens.iloc[int(row_idx)]["Token"]
                             new_status_value = updated_cols["Status"]
                             
-                            # Push updates directly to the Google Sheet backend
                             with st.spinner("Syncing status change to Google Sheets..."):
                                 if update_token_status(sheet, token_to_update, new_status_value):
                                     st.toast(f"Status updated to {new_status_value}!", icon="🚀")
