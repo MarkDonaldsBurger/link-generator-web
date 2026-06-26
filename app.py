@@ -144,25 +144,25 @@ if sheet:
                             st.markdown("### Click below to proceed to your assignment workspace:")
                             
                             # MODIFIED LINE (Old line 132): Broken out of the iframe using target="_blank" HTML wrapper 
+                            # Complete frame breakout to bypass Microsoft's iframe defense
                             st.markdown(
                                 f"""
-                                <a href="{form_url}" target="_blank" style="text-decoration: none;">
-                                    <button style="
-                                        width: 100%;
-                                        background-color: #ff4b4b;
-                                        color: white;
-                                        border: none;
-                                        padding: 0.5rem 1rem;
-                                        border-radius: 0.5rem;
-                                        cursor: pointer;
-                                        font-size: 1rem;
-                                        font-weight: 500;
-                                        line-height: 1.6;
-                                        text-align: center;
-                                    ">
-                                        👉 Open Microsoft Form Workspace (Opens New Tab)
-                                    </button>
-                                </a>
+                                <button onclick="window.top.location.href='{form_url}';" style="
+                                    width: 100%;
+                                    background-color: #ff4b4b;
+                                    color: white;
+                                    border: none;
+                                    padding: 0.75rem 1rem;
+                                    border-radius: 0.5rem;
+                                    cursor: pointer;
+                                    font-size: 1rem;
+                                    font-weight: bold;
+                                    line-height: 1.6;
+                                    text-align: center;
+                                    box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+                                ">
+                                    👉 Open Microsoft Form Workspace (Secure Breakout)
+                                </button>
                                 """,
                                 unsafe_allow_html=True
                             )
