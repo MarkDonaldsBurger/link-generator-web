@@ -106,6 +106,9 @@ def show_success_popup(url, link_type, ticket):
 # 3. Runtime Routing & Web Interface Construction
 sheet = get_sheet()
 
+# ==========================================
+# LINE 104: START OF ROUTING BLOCK
+# ==========================================
 if sheet:
     # Check if the visitor arrived via an generated dynamic link token link
     query_params = st.query_params
@@ -143,26 +146,26 @@ if sheet:
                             st.success("Verification successful! Access granted.")
                             st.markdown("### Click below to proceed to your assignment workspace:")
                             
-                            # MODIFIED LINE (Old line 132): Broken out of the iframe using target="_blank" HTML wrapper 
-                            # Complete frame breakout to bypass Microsoft's iframe defense
+                            # LINE 141-163: Pure HTML Anchor Tab Breakout Patch
                             st.markdown(
                                 f"""
-                                <button onclick="window.top.location.href='{form_url}';" style="
-                                    width: 100%;
-                                    background-color: #ff4b4b;
-                                    color: white;
-                                    border: none;
-                                    padding: 0.75rem 1rem;
-                                    border-radius: 0.5rem;
-                                    cursor: pointer;
-                                    font-size: 1rem;
-                                    font-weight: bold;
-                                    line-height: 1.6;
-                                    text-align: center;
-                                    box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
-                                ">
-                                    👉 Open Microsoft Form Workspace (Secure Breakout)
-                                </button>
+                                <div style="text-align: center; margin-top: 20px;">
+                                    <a href="{form_url}" target="_blank" rel="noopener noreferrer" style="
+                                        display: block;
+                                        width: 100%;
+                                        background-color: #ff4b4b;
+                                        color: white;
+                                        text-decoration: none;
+                                        padding: 0.75rem 1rem;
+                                        border-radius: 0.5rem;
+                                        font-size: 1rem;
+                                        font-weight: bold;
+                                        box-sizing: border-box;
+                                        box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+                                    ">
+                                        👉 Open Microsoft Form Workspace (Opens in Clean Tab)
+                                    </a>
+                                </div>
                                 """,
                                 unsafe_allow_html=True
                             )
