@@ -5,7 +5,7 @@ from google.oauth2.service_account import Credentials
 from datetime import datetime
 import pandas as pd
 
-# Global Style for Alignment
+# Global Style for Precise Button Alignment
 st.markdown("""
     <style>
     div[data-testid="column"]:nth-of-type(5) .stButton button { margin-top: 28px; }
@@ -28,7 +28,7 @@ def get_sheet():
     if client: return client.open_by_url("https://docs.google.com/spreadsheets/d/1J8WLEW2ZI57iUDNU4zzGoN1jI7MW_F06EX2mLN6fZhE/edit?usp=sharing").sheet1
     return None
 
-# 2. Database
+# 2. Database Functions
 def load_tokens_from_sheet(sheet):
     records = sheet.get_all_records()
     if not records: return pd.DataFrame()
@@ -39,22 +39,20 @@ def load_tokens_from_sheet(sheet):
     if "Token" in df.columns:
         df["Full Generated Link"] = base_app_url + "?token=" + df["Token"].astype(str)
     
-    # Precise display order: Status first, followed by others
+    # Precise ordering
     desired_order = ["Status", "Token", "Date Issued", "Ticket No.", "Form URL", "Type", "Full Generated Link"]
     df = df[[col for col in desired_order if col in df.columns]]
     return df
 
 def update_token_status(sheet, token, new_status):
     all_rows = sheet.get_all_values()
-    # Find row where Token (Column 1) matches
     for idx, row in enumerate(all_rows):
         if row and row[0] == token:
-            # Update Status (Column 2)
             sheet.update_cell(idx + 1, 2, new_status)
             return True
     return False
 
-# 3. UI
+# 3. Main UI
 sheet = get_sheet()
 if sheet:
     st.title("🔗 Management Console")
@@ -67,13 +65,33 @@ if sheet:
         status = st.selectbox("Status", ["On hold", "Active", "Terminated", "Used"])
         c1, c2 = st.columns(2)
         
-        # STRICT ORDER: [Token, Status, Date Issued, Ticket No., Form URL, Type]
+        def handle_generation(t_no, status, link_type, form_url):
+            if not t_no:
+                st.error("Please enter a Ticket No.")
+                return
+            
+            # Check for duplicate
+            is_duplicate = not df_tokens[(df_tokens["Ticket No."].astype(str) == str(t_no)) & (df_tokens["Type"] == link_type)].empty
+            
+            if is_duplicate:
+                st.warning(f"A record for {link_type} for ticket {t_no} already exists!")
+            else:
+                token_val = str(uuid.uuid4())
+                sheet.append_row([token_val, status, datetime.now().strftime("%Y-%m-%d"), t_no, form_url, link_type])
+                
+                # Show Success Prompt
+                full_link = f"https://dynamiclinkgeneratorpy-jvrqcasnbsduy6hwwmco58.streamlit.app/?token={token_val}"
+                st.success(f"Successfully generated {link_type.lower()} link!")
+                st.code(full_link, language="text") # This creates a copy button natively
+                
+                if st.button("OK/Refresh"):
+                    st.rerun()
+
         if c1.button("Generate Internal", use_container_width=True):
-            sheet.append_row([str(uuid.uuid4()), status, datetime.now().strftime("%Y-%m-%d"), t_no, "https://forms.office.com/r/5s3GA7Df0T", "INTERNAL"])
-            st.rerun()
+            handle_generation(t_no, status, "INTERNAL", "https://forms.office.com/r/5s3GA7Df0T")
+            
         if c2.button("Generate External", use_container_width=True):
-            sheet.append_row([str(uuid.uuid4()), status, datetime.now().strftime("%Y-%m-%d"), t_no, "https://forms.office.com/r/KchEak7FWA", "EXTERNAL"])
-            st.rerun()
+            handle_generation(t_no, status, "EXTERNAL", "https://forms.office.com/r/KchEak7FWA")
 
     with col_right:
         st.subheader("Active Token Registry")
