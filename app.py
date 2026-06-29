@@ -40,16 +40,20 @@ def load_tokens_from_sheet(sheet):
         df = pd.DataFrame(records)
         df.columns = df.columns.str.strip()
         
+        # Handle column name variations
         if "Ticket No." not in df.columns:
             if "Ticket Number" in df.columns:
                 df = df.rename(columns={"Ticket Number": "Ticket No."})
             elif "Ticket_No" in df.columns:
                 df = df.rename(columns={"Ticket_No": "Ticket No."})
         
+        # Build the full clickable/copyable URL
         base_app_url = "https://dynamiclinkgeneratorpy-jvrqcasnbsduy6hwwmco58.streamlit.app/"
         if "Token" in df.columns:
             df["Full Generated Link"] = base_app_url + "?token=" + df["Token"].astype(str)
         
+        # KEY CHANGE: Ensure "Status" is the last item in this list 
+        # so it renders at the far right of the table
         desired_order = ["Ticket No.", "Type", "Date Issued", "Token", "Full Generated Link", "Form URL", "Status"]
         current_order = [col for col in desired_order if col in df.columns]
         df = df[current_order]
