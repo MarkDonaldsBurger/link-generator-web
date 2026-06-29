@@ -23,27 +23,32 @@ def get_sheet():
 
 # 2. Database
 def load_tokens_from_sheet(sheet):
-    records = sheet.get_all_records()
-    if not records: 
-        return pd.DataFrame()
-    
-    df = pd.DataFrame(records)
-    df.columns = df.columns.str.strip()
-    
-    # 1. Keep your URL generation logic as is
-    base_url = "https://dynamiclinkgeneratorpy-jvrqcasnbsduy6hwwmco58.streamlit.app/"
-    if "Token" in df.columns: 
-        df["Full Generated Link"] = base_url + "?token=" + df["Token"].astype(str)
-    
-    # 2. DEFINE THE DISPLAY ORDER
-    # By placing "Status" at the front of this list, it will appear 
-    # as the leftmost column in your Streamlit table.
-    desired_order = ["Status", "Ticket No.", "Type", "Date Issued", "Token", "Full Generated Link", "Form URL"]
-    
-    # This filter ensures we only try to display columns that actually exist
-    ordered_columns = [col for col in desired_order if col in df.columns]
-    
-    return df[ordered_columns]
+    try:
+        records = sheet.get_all_records()
+        if not records:
+            return pd.DataFrame()
+        
+        df = pd.DataFrame(records)
+        df.columns = df.columns.str.strip()
+        
+        # Build the full clickable/copyable URL
+        base_app_url = "https://dynamiclinkgeneratorpy-jvrqcasnbsduy6hwwmco58.streamlit.app/"
+        if "Token" in df.columns:
+            df["Full Generated Link"] = base_app_url + "?token=" + df["Token"].astype(str)
+        
+        # KEY CHANGE: 
+        # Set the display order. "Status" is first, ensuring it appears on the far left.
+        # This keeps the underlying Google Sheet format (Token, Status, etc.) untouched.
+        desired_order = ["Status", "Token", "Date Issued", "Ticket No.", "Form URL", "Type", "Full Generated Link"]
+        
+        # Keep only columns that exist in the dataframe
+        current_order = [col for col in desired_order if col in df.columns]
+        df = df[current_order]
+        
+        return df
+    except Exception as e:
+        st.error(f"Error reading datastore: {e}")
+        return None
 
 def update_token_status(sheet, token, new_status):
     all_rows = sheet.get_all_values()
