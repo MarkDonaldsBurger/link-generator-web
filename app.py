@@ -96,5 +96,8 @@ if sheet:
                         st.rerun()
             with b2:
                 if st.button("Cancel"):
-                    for key in ['up_type', 'up_ticket', 'up_status']: st.session_state[key] = None
+                    # Use del to remove the keys instead of setting them to None
+                    for key in ['up_type', 'up_ticket', 'up_status']:
+                        if key in st.session_state:
+                            del st.session_state[key]
                     st.rerun()
