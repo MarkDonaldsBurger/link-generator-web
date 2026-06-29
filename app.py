@@ -29,7 +29,6 @@ def load_tokens_from_sheet(sheet):
     df.columns = df.columns.str.strip()
     base_url = "https://dynamiclinkgeneratorpy-jvrqcasnbsduy6hwwmco58.streamlit.app/"
     if "Token" in df.columns: df["Full Generated Link"] = base_url + "?token=" + df["Token"].astype(str)
-    
     order = ["Status", "Ticket No.", "Type", "Date Issued", "Token", "Full Generated Link", "Form URL"]
     return df[[c for c in order if c in df.columns]]
 
@@ -44,57 +43,58 @@ def update_token_status(sheet, token, new_status):
 # 3. Main Interface
 sheet = get_sheet()
 if sheet:
-    query_params = st.query_params
-    token = query_params.get("token")
+    st.title("🔗 Management Console")
+    df_tokens = load_tokens_from_sheet(sheet)
+    
+    c1, c2 = st.columns([1, 3])
+    
+    with c1:
+        st.subheader("Generate New Link")
+        t_no = st.text_input("Ticket No.")
+        status = st.selectbox("Status", ["On hold", "Active", "Terminated", "Used"])
+        if st.button("Generate Internal"):
+            sheet.append_row([status, t_no, "INTERNAL", datetime.now().strftime("%Y-%m-%d"), str(uuid.uuid4()), "https://forms.office.com/r/5s3GA7Df0T"])
+            st.rerun()
+        if st.button("Generate External"):
+            sheet.append_row([status, t_no, "EXTERNAL", datetime.now().strftime("%Y-%m-%d"), str(uuid.uuid4()), "https://forms.office.com/r/KchEak7FWA"])
+            st.rerun()
 
-    if token:
-        st.title("🛡️ Internal Verification")
-        email = st.text_input("Office Email:")
-        if email and email.endswith("@dti.gov.ph"):
-            df = load_tokens_from_sheet(sheet)
-            match = df[df["Token"] == token]
-            if not match.empty and match.iloc[0]["Status"] == "Active":
-                st.link_button("👉 Proceed to Workspace", url=match.iloc[0]["Form URL"], type="primary")
-    else:
-        st.title("🔗 Management Console")
-        df_tokens = load_tokens_from_sheet(sheet)
+    with c2:
+        st.subheader("Active Token Registry")
+        # Filters
+        f1, f2 = st.columns(2)
+        with f1: search = st.text_input("🔍 Search by Ticket No.")
+        with f2: type_filter = st.selectbox("📂 Filter by Type", ["All", "INTERNAL", "EXTERNAL"])
         
-        c1, c2 = st.columns([1, 3])
+        display_df = df_tokens
+        if search: display_df = display_df[display_df["Ticket No."].astype(str).str.contains(search, case=False)]
+        if type_filter != "All": display_df = display_df[display_df["Type"] == type_filter]
         
-        with c1:
-            st.subheader("Generate New Link")
-            t_no = st.text_input("Ticket No.")
-            status = st.selectbox("Status", ["On hold", "Active", "Terminated", "Used"])
-            if st.button("Generate Internal"):
-                sheet.append_row([status, t_no, "INTERNAL", datetime.now().strftime("%Y-%m-%d"), str(uuid.uuid4()), "https://forms.office.com/r/5s3GA7Df0T"])
-                st.rerun()
-            if st.button("Generate External"):
-                sheet.append_row([status, t_no, "EXTERNAL", datetime.now().strftime("%Y-%m-%d"), str(uuid.uuid4()), "https://forms.office.com/r/KchEak7FWA"])
-                st.rerun()
+        st.dataframe(display_df, use_container_width=True, hide_index=True)
+        
+        # Status Update Tool
+        st.markdown("#### ✏️ Quick Status Update")
+        # Initialize session state for resets
+        if 'up_type' not in st.session_state: st.session_state.up_type = "INTERNAL"
+        if 'up_ticket' not in st.session_state: st.session_state.up_ticket = None
 
-        with c2:
-            st.subheader("Active Token Registry")
-            # RESTORED: Filter Search
-            search = st.text_input("🔍 Search by Ticket No.")
-            display_df = df_tokens
-            if search:
-                display_df = display_df[display_df["Ticket No."].astype(str).str.contains(search, case=False)]
-            
-            st.dataframe(display_df, use_container_width=True, hide_index=True)
-            
-            # RESTORED: Status Update Tool
-            st.markdown("#### ✏️ Quick Status Update")
-            u1, u2, u3, u4 = st.columns([1.5, 2, 1.5, 1])
-            with u1: link_type = st.selectbox("Type", ["INTERNAL", "EXTERNAL"], key="up_type")
-            with u2: 
-                opts = df_tokens[df_tokens["Type"] == link_type]["Ticket No."].unique().tolist()
-                sel = st.selectbox("Select Ticket", [""] + opts)
-            with u3: n_status = st.selectbox("New Status", ["On hold", "Active", "Terminated", "Used"])
-            with u4:
-                st.write("")
+        u1, u2, u3, u4 = st.columns([1.5, 2, 1.5, 1.5])
+        with u1: link_type = st.selectbox("Type", ["INTERNAL", "EXTERNAL"], key="up_type")
+        with u2: 
+            opts = df_tokens[df_tokens["Type"] == link_type]["Ticket No."].unique().tolist()
+            sel = st.selectbox("Select Ticket", [""] + opts, key="up_ticket")
+        with u3: n_status = st.selectbox("New Status", ["On hold", "Active", "Terminated", "Used"], key="up_status")
+        with u4:
+            st.write("")
+            b1, b2 = st.columns(2)
+            with b1:
                 if st.button("Update"):
                     match = df_tokens[(df_tokens["Ticket No."].astype(str) == str(sel)) & (df_tokens["Type"] == link_type)]
                     if not match.empty:
                         update_token_status(sheet, match.iloc[0]["Token"], n_status)
                         st.success("Updated!")
                         st.rerun()
+            with b2:
+                if st.button("Cancel"):
+                    for key in ['up_type', 'up_ticket', 'up_status']: st.session_state[key] = None
+                    st.rerun()
