@@ -74,30 +74,41 @@ if sheet:
         
         # Status Update Tool
         st.markdown("#### ✏️ Quick Status Update")
-        # Initialize session state for resets
-        if 'up_type' not in st.session_state: st.session_state.up_type = "INTERNAL"
-        if 'up_ticket' not in st.session_state: st.session_state.up_ticket = None
+            # Using 5 columns to fit the extra field nicely
+            u1, u2, u3, u4, u5 = st.columns([1.5, 2, 1.5, 1.5, 1])
+            
+            with u1: 
+                link_type = st.selectbox("Type", ["INTERNAL", "EXTERNAL"], key="up_type")
+            with u2: 
+                opts = df_tokens[df_tokens["Type"] == link_type]["Ticket No."].unique().tolist()
+                sel = st.selectbox("Select Ticket", [""] + opts, key="up_ticket")
+            
+            # This logic finds the current status to display it in the read-only box
+            current_status_val = "N/A"
+            if sel:
+                match = df_tokens[(df_tokens["Ticket No."].astype(str) == str(sel)) & (df_tokens["Type"] == link_type)]
+                if not match.empty:
+                    current_status_val = match.iloc[0]["Status"]
 
-        u1, u2, u3, u4 = st.columns([1.5, 2, 1.5, 1.5])
-        with u1: link_type = st.selectbox("Type", ["INTERNAL", "EXTERNAL"], key="up_type")
-        with u2: 
-            opts = df_tokens[df_tokens["Type"] == link_type]["Ticket No."].unique().tolist()
-            sel = st.selectbox("Select Ticket", [""] + opts, key="up_ticket")
-        with u3: n_status = st.selectbox("New Status", ["On hold", "Active", "Terminated", "Used"], key="up_status")
-        with u4:
-            st.write("")
-            b1, b2 = st.columns(2)
-            with b1:
-                if st.button("Update"):
-                    match = df_tokens[(df_tokens["Ticket No."].astype(str) == str(sel)) & (df_tokens["Type"] == link_type)]
-                    if not match.empty:
-                        update_token_status(sheet, match.iloc[0]["Token"], n_status)
-                        st.success("Updated!")
+            with u3:
+                # This is the read-only field
+                st.text_input("Current Status", value=current_status_val, disabled=True)
+            
+            with u4: 
+                n_status = st.selectbox("New Status", ["On hold", "Active", "Terminated", "Used"], key="up_status")
+            
+            with u5:
+                st.write("") # Spacer
+                b_up, b_can = st.columns(2)
+                with b_up:
+                    if st.button("Update"):
+                        match = df_tokens[(df_tokens["Ticket No."].astype(str) == str(sel)) & (df_tokens["Type"] == link_type)]
+                        if not match.empty:
+                            update_token_status(sheet, match.iloc[0]["Token"], n_status)
+                            st.success("Updated!")
+                            st.rerun()
+                with b_can:
+                    if st.button("Cancel"):
+                        for key in ['up_type', 'up_ticket', 'up_status']:
+                            if key in st.session_state: del st.session_state[key]
                         st.rerun()
-            with b2:
-                if st.button("Cancel"):
-                    # Use del to remove the keys instead of setting them to None
-                    for key in ['up_type', 'up_ticket', 'up_status']:
-                        if key in st.session_state:
-                            del st.session_state[key]
-                    st.rerun()
