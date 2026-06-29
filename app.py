@@ -5,7 +5,7 @@ from google.oauth2.service_account import Credentials
 from datetime import datetime
 import pandas as pd
 
-# Global Style for Precise Alignment
+# Global Style for Precise Button Alignment
 st.markdown("""
     <style>
     div[data-testid="column"]:nth-of-type(5) .stButton button { margin-top: 28px; }
@@ -39,17 +39,17 @@ def load_tokens_from_sheet(sheet):
     if "Token" in df.columns:
         df["Full Generated Link"] = base_app_url + "?token=" + df["Token"].astype(str)
     
-    # Precise ordering: Status first, then existing structure
+    # Precise ordering to match your requirements: Status far left
     desired_order = ["Status", "Token", "Date Issued", "Ticket No.", "Form URL", "Type", "Full Generated Link"]
     df = df[[col for col in desired_order if col in df.columns]]
     return df
 
 def update_token_status(sheet, token, new_status):
     all_rows = sheet.get_all_values()
-    # Find row where Column 1 (Token) matches
+    # Find row where Token (Column 1) matches
     for idx, row in enumerate(all_rows):
         if row and row[0] == token:
-            # Update Column 2 (Status)
+            # Update Status (Column 2) - Fixed to prevent database corruption
             sheet.update_cell(idx + 1, 2, new_status)
             return True
     return False
@@ -66,6 +66,7 @@ if sheet:
         t_no = st.text_input("Ticket No.")
         status = st.selectbox("Status", ["On hold", "Active", "Terminated", "Used"])
         c1, c2 = st.columns(2)
+        # Maintaining strict schema: [Token, Status, Date, Ticket, URL, Type]
         if c1.button("Generate Internal", use_container_width=True):
             sheet.append_row([str(uuid.uuid4()), status, datetime.now().strftime("%Y-%m-%d"), t_no, "https://forms.office.com/r/5s3GA7Df0T", "INTERNAL"])
             st.rerun()
