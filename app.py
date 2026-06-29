@@ -55,8 +55,8 @@ def load_tokens_from_sheet(sheet):
         if "Token" in df.columns:
             df["Full Generated Link"] = base_app_url + "?token=" + df["Token"].astype(str)
         
-        # Reorder columns so the Full Link is easily visible
-        desired_order = ["Token", "Status", "Date Issued", "Ticket No.", "Full Generated Link", "Form URL", "Type"]
+        # REORDERED: Moved "Status" to the far right end to encourage scrolling
+        desired_order = ["Ticket No.", "Type", "Date Issued", "Token", "Full Generated Link", "Form URL", "Status"]
         current_order = [col for col in desired_order if col in df.columns]
         df = df[current_order]
         
@@ -106,9 +106,6 @@ def show_success_popup(url, link_type, ticket):
 # 3. Runtime Routing & Web Interface Construction
 sheet = get_sheet()
 
-# ==========================================
-# LINE 104: START OF ROUTING BLOCK
-# ==========================================
 if sheet:
     # Check if the visitor arrived via an generated dynamic link token link
     query_params = st.query_params
@@ -146,7 +143,6 @@ if sheet:
                             st.success("Verification successful! Access granted.")
                             st.markdown("### Click below to proceed to your assignment workspace:")
                             
-                            # LINE 141-163: Pure HTML Anchor Tab Breakout Patch
                             st.markdown(
                                 f"""
                                 <div style="text-align: center; margin-top: 20px;">
@@ -236,14 +232,28 @@ if sheet:
             df_tokens = load_tokens_from_sheet(sheet)
             
             if df_tokens is not None and not df_tokens.empty:
-                search_query = st.text_input("🔍 Filter by Ticket No. or Token String").strip().lower()
+                # Add columns for the filters to sit side-by-side
+                filter_col1, filter_col2 = st.columns([2, 1])
+                
+                with filter_col1:
+                    search_query = st.text_input("🔍 Filter by Ticket No. or Token String").strip().lower()
+                
+                with filter_col2:
+                    # New dropdown filter for Internal/External
+                    type_filter = st.selectbox("📂 Filter by Link Type", ["All", "INTERNAL", "EXTERNAL"])
+
+                # 1. Apply the text search filter
                 if search_query:
                     df_tokens = df_tokens[
                         df_tokens['Ticket No.'].astype(str).str.lower().str.contains(search_query) | 
                         df_tokens['Token'].astype(str).str.lower().str.contains(search_query)
                     ]
                 
-                st.caption("📝 **Tip:** Double-click any cell in the **Status** column below to change it directly inside the grid!")
+                # 2. Apply the Internal/External dropdown filter
+                if type_filter != "All":
+                    df_tokens = df_tokens[df_tokens['Type'] == type_filter]
+                
+                st.caption("📝 **Tip:** Scroll to the right and double-click any cell in the **Status** column below to change it directly inside the grid!")
 
                 edited_df = st.data_editor(
                     df_tokens,
