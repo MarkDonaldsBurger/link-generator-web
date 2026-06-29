@@ -40,16 +40,20 @@ def load_tokens_from_sheet(sheet):
         df = pd.DataFrame(records)
         df.columns = df.columns.str.strip()
         
+        # Handle column name variations
         if "Ticket No." not in df.columns:
             if "Ticket Number" in df.columns:
                 df = df.rename(columns={"Ticket Number": "Ticket No."})
             elif "Ticket_No" in df.columns:
                 df = df.rename(columns={"Ticket_No": "Ticket No."})
         
+        # Build the full clickable/copyable URL
         base_app_url = "https://dynamiclinkgeneratorpy-jvrqcasnbsduy6hwwmco58.streamlit.app/"
         if "Token" in df.columns:
             df["Full Generated Link"] = base_app_url + "?token=" + df["Token"].astype(str)
         
+        # KEY CHANGE: Ensure "Status" is the last item in this list 
+        # so it renders at the far right of the table
         desired_order = ["Ticket No.", "Type", "Date Issued", "Token", "Full Generated Link", "Form URL", "Status"]
         current_order = [col for col in desired_order if col in df.columns]
         df = df[current_order]
@@ -101,70 +105,181 @@ if sheet:
     token_param = query_params.get("token")
 
     if token_param:
+        # --------------------------------------------------
         # GATEKEEPER VIEW
+        # --------------------------------------------------
         st.title("🛡️ Internal Verification Gateway")
+        st.write("This workflow workspace is restricted strictly to authorized department personnel.")
+        
         user_email = st.text_input("Enter your official office email address:", placeholder="username@dti.gov.ph").strip().lower()
 
         if user_email:
             if not user_email.endswith("@dti.gov.ph"):
-                st.error("Access Denied: You must use an authorized organizational email address (@dti.gov.ph).")
+                st.error("Access Denied: You must use an authorized organizational email address (@dti.gov.ph) to access this form.")
             else:
-                df_tokens = load_tokens_from_sheet(sheet)
-                matched_row = df_tokens[df_tokens["Token"] == token_param] if df_tokens is not None else pd.DataFrame()
-                
-                if matched_row.empty:
-                    st.error("Invalid Link Sequence.")
-                else:
-                    status = matched_row.iloc[0]["Status"]
-                    form_url = matched_row.iloc[0]["Form URL"]
+                with st.spinner("Verifying runtime link state credentials..."):
+                    df_tokens = load_tokens_from_sheet(sheet)
+                    matched_row = df_tokens[df_tokens["Token"] == token_param] if df_tokens is not None else pd.DataFrame()
                     
-                    if status != "Active":
-                        st.error(f"Access Denied: Link is {status}.")
+                    if matched_row.empty:
+                        st.error("Invalid Link Sequence: The system cannot locate this transactional token tracking key.")
                     else:
-                        st.success("Verification successful! Access granted.")
-                        st.markdown(
-                            f"""<a href="{form_url}" target="_blank" style="display: block; width: 100%; background-color: #ff4b4b; color: white; text-align: center; padding: 1rem; border-radius: 0.5rem; text-decoration: none; font-weight: bold;">
-                            👉 Open Microsoft Form Workspace</a>""", unsafe_allow_html=True
-                        )
+                        status = matched_row.iloc[0]["Status"]
+                        form_url = matched_row.iloc[0]["Form URL"]
+                        
+                        if status != "Active":
+                            st.error(f"Access Denied: This link assignment is no longer accessible. Current Status: **{status}**.")
+                        else:
+                            st.success("Verification successful! Access granted.")
+                            st.markdown("### Click below to proceed to your assignment workspace:")
+                            
+                            st.markdown(
+                                f"""
+                                <div style="text-align: center; margin-top: 20px;">
+                                    <a href="{form_url}" target="_blank" rel="noopener noreferrer" style="
+                                        display: block;
+                                        width: 100%;
+                                        background-color: #ff4b4b;
+                                        color: white;
+                                        text-decoration: none;
+                                        padding: 0.75rem 1rem;
+                                        border-radius: 0.5rem;
+                                        font-size: 1rem;
+                                        font-weight: bold;
+                                        box-sizing: border-box;
+                                        box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+                                    ">
+                                        👉 Open Microsoft Form Workspace (Opens in Clean Tab)
+                                    </a>
+                                </div>
+                                """,
+                                unsafe_allow_html=True
+                            )
     else:
+        # --------------------------------------------------
         # CONSOLE VIEW
+        # --------------------------------------------------
         st.title("🔗 Dynamic Link Generator & Management Console")
+        
         col1, col2 = st.columns([1, 2])
         
         with col1:
             st.subheader("Generate New Request Link")
-            ticket_no = st.text_input("Ticket No. / Identifier")
+            ticket_no = st.text_input("Ticket No. / Identifier", placeholder="Enter unique ID...")
             initial_status = st.selectbox("Initial Status", ["On hold", "Active", "Terminated", "Used"])
             
-            b1, b2 = st.columns(2)
-            if b1.button("Gen. External", use_container_width=True):
-                token, url = generate_client_link(sheet, ticket_no, initial_status, "EXTERNAL")
-                if token: show_success_popup(url, "EXTERNAL", ticket_no)
-            if b2.button("Gen. Internal", use_container_width=True):
-                token, url = generate_client_link(sheet, ticket_no, initial_status, "INTERNAL")
-                if token: show_success_popup(url, "INTERNAL", ticket_no)
+            btn_ext, btn_int = st.columns(2)
+            with btn_ext:
+                if st.button("Generate External Link", use_container_width=True):
+                    if ticket_no.strip():
+                        current_df = load_tokens_from_sheet(sheet)
+                        duplicate_exists = False
+                        if current_df is not None and not current_df.empty:
+                            duplicate_exists = not current_df[
+                                (current_df["Ticket No."].astype(str) == str(ticket_no.strip())) & 
+                                (current_df["Type"] == "EXTERNAL")
+                            ].empty
+                        
+                        if duplicate_exists:
+                            st.error(f"Validation Error: Ticket No. '{ticket_no.strip()}' already has an active EXTERNAL link.")
+                        else:
+                            with st.spinner("Generating External Link..."):
+                                token, url = generate_client_link(sheet, ticket_no.strip(), initial_status, "EXTERNAL")
+                                if token:
+                                    show_success_popup(url, "EXTERNAL", ticket_no.strip())
+                    else:
+                        st.warning("Please fill in the Ticket Number field.")
+                        
+            with btn_int:
+                if st.button("Generate Internal Link", use_container_width=True):
+                    if ticket_no.strip():
+                        current_df = load_tokens_from_sheet(sheet)
+                        duplicate_exists = False
+                        if current_df is not None and not current_df.empty:
+                            duplicate_exists = not current_df[
+                                (current_df["Ticket No."].astype(str) == str(ticket_no.strip())) & 
+                                (current_df["Type"] == "INTERNAL")
+                            ].empty
+                        
+                        if duplicate_exists:
+                            st.error(f"Validation Error: Ticket No. '{ticket_no.strip()}' already has an active INTERNAL link.")
+                        else:
+                            with st.spinner("Generating Internal Link..."):
+                                token, url = generate_client_link(sheet, ticket_no.strip(), initial_status, "INTERNAL")
+                                if token:
+                                    show_success_popup(url, "INTERNAL", ticket_no.strip())
+                    else:
+                        st.warning("Please fill in the Ticket Number field.")
 
         with col2:
             st.subheader("Real-Time Token Sync View")
-            if st.button("🔄 Refresh Data"): st.cache_data.clear(); st.rerun()
-            df_tokens = load_tokens_from_sheet(sheet)
-            st.dataframe(df_tokens, use_container_width=True, hide_index=True)
-
-            # REFINED QUICK STATUS UPDATE TOOL
-            st.divider()
-            st.markdown("#### ✏️ Quick Status Update")
             
-            type_select = st.selectbox("1. Filter by Link Type", options=["INTERNAL", "EXTERNAL"], key="upd_type")
-            type_filtered_df = df_tokens[df_tokens["Type"] == type_select]
-            
-            selected_ticket = st.selectbox("2. Select or Type Ticket Number", options=["-- Select --"] + type_filtered_df["Ticket No."].unique().tolist(), key="upd_ticket")
-            
-            if selected_ticket != "-- Select --":
-                row = type_filtered_df[type_filtered_df["Ticket No."] == selected_ticket].iloc[0]
-                new_status = st.selectbox("3. Select New Status", options=["On hold", "Active", "Terminated", "Used"], index=["On hold", "Active", "Terminated", "Used"].index(row["Status"]))
+            if st.button("🔄 Refresh Shared Sheet Data"):
+                st.cache_data.clear()
+                st.rerun()
                 
-                c1, c2 = st.columns(2)
-                if c1.button("💾 Confirm Update", type="primary", use_container_width=True):
-                    if update_token_status(sheet, row["Token"], new_status):
-                        st.toast("Updated successfully!", icon="✅"); st.cache_data.clear(); st.rerun()
-                if c2.button("🔄 Refresh Page", use_container_width=True): st.cache_data.clear(); st.rerun()
+            df_tokens = load_tokens_from_sheet(sheet)
+            
+            if df_tokens is not None and not df_tokens.empty:
+                # Top Filters
+                filter_col1, filter_col2 = st.columns([2, 1])
+                
+                with filter_col1:
+                    search_query = st.text_input("🔍 Filter by Ticket No. or Token String").strip().lower()
+                
+                with filter_col2:
+                    type_filter = st.selectbox("📂 Filter by Link Type", ["All", "INTERNAL", "EXTERNAL"])
+
+                # Apply Filters
+                if search_query:
+                    df_tokens = df_tokens[
+                        df_tokens['Ticket No.'].astype(str).str.lower().str.contains(search_query) | 
+                        df_tokens['Token'].astype(str).str.lower().str.contains(search_query)
+                    ]
+                
+                if type_filter != "All":
+                    df_tokens = df_tokens[df_tokens['Type'] == type_filter]
+                
+                # Display Read-Only Dataframe
+                st.dataframe(df_tokens, use_container_width=True, hide_index=True)
+
+                # ==========================================
+                # NEW FEATURE: QUICK STATUS UPDATE TOOL
+                # ==========================================
+                st.divider()
+                st.markdown("#### ✏️ Quick Status Update")
+                
+                # Create a unique readable ID for the dropdown
+                df_tokens["Update_ID"] = df_tokens["Ticket No."].astype(str) + " [" + df_tokens["Type"] + "]"
+                
+                update_col1, update_col2, update_col3 = st.columns([2, 2, 1.5])
+                
+                with update_col1:
+                    selected_id = st.selectbox("1. Select Record to Update", options=["-- Select --"] + df_tokens["Update_ID"].tolist())
+                
+                if selected_id != "-- Select --":
+                    # Get the data for the selected record
+                    target_row = df_tokens[df_tokens["Update_ID"] == selected_id].iloc[0]
+                    current_status = target_row["Status"]
+                    target_token = target_row["Token"]
+                    
+                    with update_col2:
+                        status_options = ["On hold", "Active", "Terminated", "Used"]
+                        # Set the dropdown to whatever the current status is
+                        current_idx = status_options.index(current_status) if current_status in status_options else 0
+                        new_status = st.selectbox("2. Select New Status", options=status_options, index=current_idx)
+                    
+                    with update_col3:
+                        st.write("") # Blank spaces to align the button with the dropdown fields
+                        st.write("")
+                        
+                        # Only show the update button if they actually changed the dropdown
+                        if new_status != current_status:
+                            if st.button("💾 Confirm Update", type="primary", use_container_width=True):
+                                with st.spinner("Syncing to Google Sheets..."):
+                                    if update_token_status(sheet, target_token, new_status):
+                                        st.toast(f"Status successfully changed to {new_status}!", icon="✅")
+                                        st.cache_data.clear()
+                                        st.rerun()
+            else:
+                st.info("The central datastore is currently tracking 0 active links.")
