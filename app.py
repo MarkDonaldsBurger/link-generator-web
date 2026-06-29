@@ -24,13 +24,26 @@ def get_sheet():
 # 2. Database
 def load_tokens_from_sheet(sheet):
     records = sheet.get_all_records()
-    if not records: return pd.DataFrame()
+    if not records: 
+        return pd.DataFrame()
+    
     df = pd.DataFrame(records)
     df.columns = df.columns.str.strip()
+    
+    # 1. Keep your URL generation logic as is
     base_url = "https://dynamiclinkgeneratorpy-jvrqcasnbsduy6hwwmco58.streamlit.app/"
-    if "Token" in df.columns: df["Full Generated Link"] = base_url + "?token=" + df["Token"].astype(str)
-    order = ["Status", "Ticket No.", "Type", "Date Issued", "Token", "Full Generated Link", "Form URL"]
-    return df[[c for c in order if c in df.columns]]
+    if "Token" in df.columns: 
+        df["Full Generated Link"] = base_url + "?token=" + df["Token"].astype(str)
+    
+    # 2. DEFINE THE DISPLAY ORDER
+    # By placing "Status" at the front of this list, it will appear 
+    # as the leftmost column in your Streamlit table.
+    desired_order = ["Status", "Ticket No.", "Type", "Date Issued", "Token", "Full Generated Link", "Form URL"]
+    
+    # This filter ensures we only try to display columns that actually exist
+    ordered_columns = [col for col in desired_order if col in df.columns]
+    
+    return df[ordered_columns]
 
 def update_token_status(sheet, token, new_status):
     all_rows = sheet.get_all_values()
