@@ -5,10 +5,13 @@ from google.oauth2.service_account import Credentials
 from datetime import datetime
 import pandas as pd
 
-# Global Style for Precise Button Alignment
+# Global Style for Button Alignment
 st.markdown("""
     <style>
-    div[data-testid="column"]:nth-of-type(5) .stButton button { margin-top: 28px; }
+    /* Force buttons to align with the bottom of the input boxes */
+    div.stButton > button { margin-top: 28px; width: 100%; }
+    /* Style for the Update/Cancel button row specifically */
+    .button-row { display: flex; gap: 10px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -29,6 +32,7 @@ def get_sheet():
     return None
 
 # 2. Database Functions
+@st.cache_data(ttl=600) # Caches data for 10 minutes to improve performance
 def load_tokens_from_sheet(sheet):
     records = sheet.get_all_records()
     if not records: return pd.DataFrame()
@@ -39,7 +43,6 @@ def load_tokens_from_sheet(sheet):
     if "Token" in df.columns:
         df["Full Generated Link"] = base_app_url + "?token=" + df["Token"].astype(str)
     
-    # Precise ordering
     desired_order = ["Status", "Token", "Date Issued", "Ticket No.", "Form URL", "Type", "Full Generated Link"]
     df = df[[col for col in desired_order if col in df.columns]]
     return df
@@ -52,10 +55,19 @@ def update_token_status(sheet, token, new_status):
             return True
     return False
 
-# 3. Main UI
+# 3. UI
 sheet = get_sheet()
 if sheet:
     st.title("🔗 Management Console")
+    
+    # Refresh Logic
+    col_main1, col_main2 = st.columns([4, 1])
+    with col_main1: st.subheader("Active Token Registry")
+    with col_main2:
+        if st.button("🔄 Refresh Table"):
+            st.cache_data.clear()
+            st.rerun()
+
     df_tokens = load_tokens_from_sheet(sheet)
     col_left, col_right = st.columns([1, 3])
     
@@ -69,32 +81,21 @@ if sheet:
             if not t_no:
                 st.error("Please enter a Ticket No.")
                 return
-            
-            # Check for duplicate
             is_duplicate = not df_tokens[(df_tokens["Ticket No."].astype(str) == str(t_no)) & (df_tokens["Type"] == link_type)].empty
-            
             if is_duplicate:
                 st.warning(f"A record for {link_type} for ticket {t_no} already exists!")
             else:
                 token_val = str(uuid.uuid4())
                 sheet.append_row([token_val, status, datetime.now().strftime("%Y-%m-%d"), t_no, form_url, link_type])
-                
-                # Show Success Prompt
-                full_link = f"https://dynamiclinkgeneratorpy-jvrqcasnbsduy6hwwmco58.streamlit.app/?token={token_val}"
+                st.cache_data.clear() # Clear cache so data updates immediately
                 st.success(f"Successfully generated {link_type.lower()} link!")
-                st.code(full_link, language="text") # This creates a copy button natively
-                
-                if st.button("OK/Refresh"):
-                    st.rerun()
+                st.code(f"https://dynamiclinkgeneratorpy-jvrqcasnbsduy6hwwmco58.streamlit.app/?token={token_val}", language="text")
+                if st.button("OK/Refresh"): st.rerun()
 
-        if c1.button("Generate Internal", use_container_width=True):
-            handle_generation(t_no, status, "INTERNAL", "https://forms.office.com/r/5s3GA7Df0T")
-            
-        if c2.button("Generate External", use_container_width=True):
-            handle_generation(t_no, status, "EXTERNAL", "https://forms.office.com/r/KchEak7FWA")
+        if c1.button("Generate Internal", use_container_width=True): handle_generation(t_no, status, "INTERNAL", "https://forms.office.com/r/5s3GA7Df0T")
+        if c2.button("Generate External", use_container_width=True): handle_generation(t_no, status, "EXTERNAL", "https://forms.office.com/r/KchEak7FWA")
 
     with col_right:
-        st.subheader("Active Token Registry")
         f1, f2 = st.columns(2)
         with f1: search = st.text_input("🔍 Search by Ticket No.")
         with f2: type_filter = st.selectbox("📂 Filter by Type", ["All", "INTERNAL", "EXTERNAL"])
@@ -102,11 +103,10 @@ if sheet:
         d_df = df_tokens
         if search: d_df = d_df[d_df["Ticket No."].astype(str).str.contains(search, case=False)]
         if type_filter != "All": d_df = d_df[d_df["Type"] == type_filter]
-        
         st.dataframe(d_df, use_container_width=True, hide_index=True)
         
         st.markdown("#### ✏️ Quick Status Update")
-        u1, u2, u3, u4, u5 = st.columns([1.5, 2, 1.2, 1.2, 1.5])
+        u1, u2, u3, u4 = st.columns([1.5, 2, 1.2, 1.2]) # Removed extra columns to simplify layout
         
         with u1: link_type = st.selectbox("Type", ["INTERNAL", "EXTERNAL"], key="up_type")
         with u2: 
@@ -121,14 +121,15 @@ if sheet:
         with u3: st.text_input("Current Status", value=c_status, disabled=True)
         with u4: n_status = st.selectbox("New Status", ["On hold", "Active", "Terminated", "Used"], key="up_status")
         
-        with u5:
-            b_up, b_can = st.columns(2)
-            if b_up.button("Update", use_container_width=True):
-                match = df_tokens[(df_tokens["Ticket No."].astype(str) == str(sel)) & (df_tokens["Type"] == link_type)]
-                if not match.empty:
-                    update_token_status(sheet, match.iloc[0]["Token"], n_status)
-                    st.rerun()
-            if b_can.button("Cancel", use_container_width=True):
-                for k in ['up_type', 'up_ticket', 'up_status']:
-                    if k in st.session_state: del st.session_state[k]
+        # Aligned Button Row
+        b_col1, b_col2 = st.columns([1, 1])
+        if b_col1.button("Update", use_container_width=True):
+            match = df_tokens[(df_tokens["Ticket No."].astype(str) == str(sel)) & (df_tokens["Type"] == link_type)]
+            if not match.empty:
+                update_token_status(sheet, match.iloc[0]["Token"], n_status)
+                st.cache_data.clear()
                 st.rerun()
+        if b_col2.button("Cancel", use_container_width=True):
+            for k in ['up_type', 'up_ticket', 'up_status']:
+                if k in st.session_state: del st.session_state[k]
+            st.rerun()
