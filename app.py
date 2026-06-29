@@ -52,12 +52,17 @@ if sheet:
         st.subheader("Generate New Link")
         t_no = st.text_input("Ticket No.")
         status = st.selectbox("Status", ["On hold", "Active", "Terminated", "Used"])
-        if st.button("Generate Internal"):
-            sheet.append_row([status, t_no, "INTERNAL", datetime.now().strftime("%Y-%m-%d"), str(uuid.uuid4()), "https://forms.office.com/r/5s3GA7Df0T"])
-            st.rerun()
-        if st.button("Generate External"):
-            sheet.append_row([status, t_no, "EXTERNAL", datetime.now().strftime("%Y-%m-%d"), str(uuid.uuid4()), "https://forms.office.com/r/KchEak7FWA"])
-            st.rerun()
+        
+        # SIDE-BY-SIDE BUTTONS
+        b_int, b_ext = st.columns(2)
+        with b_int:
+            if st.button("Generate Internal", use_container_width=True):
+                sheet.append_row([status, t_no, "INTERNAL", datetime.now().strftime("%Y-%m-%d"), str(uuid.uuid4()), "https://forms.office.com/r/5s3GA7Df0T"])
+                st.rerun()
+        with b_ext:
+            if st.button("Generate External", use_container_width=True):
+                sheet.append_row([status, t_no, "EXTERNAL", datetime.now().strftime("%Y-%m-%d"), str(uuid.uuid4()), "https://forms.office.com/r/KchEak7FWA"])
+                st.rerun()
 
     with c2:
         st.subheader("Active Token Registry")
@@ -71,9 +76,8 @@ if sheet:
         
         st.dataframe(display_df, use_container_width=True, hide_index=True)
         
-        # --- FIXED: Corrected indentation for Status Update block ---
         st.markdown("#### ✏️ Quick Status Update")
-        u1, u2, u3, u4, u5 = st.columns([1.5, 2, 1.5, 1.5, 1])
+        u1, u2, u3, u4, u5 = st.columns([1.5, 2, 1.5, 1.5, 1.5])
         
         with u1: 
             link_type = st.selectbox("Type", ["INTERNAL", "EXTERNAL"], key="up_type")
@@ -89,12 +93,12 @@ if sheet:
 
         with u3:
             st.text_input("Current Status", value=current_status_val, disabled=True)
-        
         with u4: 
             n_status = st.selectbox("New Status", ["On hold", "Active", "Terminated", "Used"], key="up_status")
         
+        # FIXED ALIGNMENT FOR BUTTONS
         with u5:
-            st.write("") 
+            st.write("###") # Vertical spacer to align with inputs
             b_up, b_can = st.columns(2)
             with b_up:
                 if st.button("Update"):
